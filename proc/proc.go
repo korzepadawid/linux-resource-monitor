@@ -2,8 +2,10 @@ package proc
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +14,10 @@ const (
 	procDir        = "/proc"
 	procPIDStatFmt = "/proc/%d/stat"
 	statFileSep    = " "
+	procNameIdx    = 1
+	procStateIdx   = 2
+	procUtimeIdx   = 13
+	procStimeIdx   = 14
 )
 
 var (
@@ -36,7 +42,40 @@ func ReadPIDs() ([]string, error) {
 	return dirNamesPID, nil
 }
 
-func ParsePIDStatFile(PID int) ([]string, error) {
+type ProcessStats struct {
+	Name  string
+	State string
+	UTime uint64
+	STime uint64
+}
+
+func GetStatsForPID(PID int) (*ProcessStats, error) {
+	rawStats, err := readPIDStatFile(PID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	utime, err := strconv.ParseUint(rawStats[procUtimeIdx], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stime, err := strconv.ParseUint(rawStats[procStimeIdx], 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stats := ProcessStats{
+		Name:  rawStats[procNameIdx],
+		State: rawStats[procStateIdx],
+		UTime: utime,
+		STime: stime,
+	}
+
+	return &stats, nil
+}
+
+func readPIDStatFile(PID int) ([]string, error) {
 	procPIDStatFilePath := fmt.Sprintf(procPIDStatFmt, PID)
 	fileBytes, err := os.ReadFile(procPIDStatFilePath)
 	if err != nil {

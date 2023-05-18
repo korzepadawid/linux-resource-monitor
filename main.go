@@ -28,13 +28,16 @@ func main() {
 					log.Fatal(err)
 				}
 
-				stats, err := proc.ParsePIDStatFile(numPID)
+				stats, err := proc.GetStatsForPID(numPID)
 				if err != nil {
 					log.Fatal(err)
 				}
 
 				fmt.Println(stats)
+				fmt.Printf("%s %s")
+				fmt.Println()
 			}
+
 		}
 	}
 }
