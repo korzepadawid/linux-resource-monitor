@@ -13,24 +13,24 @@ import (
 
 const (
 	// https://man7.org/linux/man-pages/man5/proc.5.html
-	procDir        = "/proc"
-	procPIDStatFmt = "/proc/%d/stat"
-	statFileSep    = " "
-	procNameIdx    = 1
-	procStateIdx   = 2
-	procUTimeIdx   = 13
-	procSTimeIdx   = 14
+	procDir          = "/proc"
+	procPIDStatFmt   = "/proc/%d/stat"
+	statFileSep      = " "
+	procNameIdx      = 1
+	procStateIdx     = 2
+	procUTimeIdx     = 13
+	procSTimeIdx     = 14
+	procStartTimeIdx = 21
 )
-
-var ()
 
 // ProcessStats represents the statistics of the given
 // process in the /proc/{proc_pid}/stat file
 type ProcessStats struct {
-	Name  string
-	State string
-	UTime uint64 // The UTime value is the time the process has been running in user mode
-	STime uint64 // The STime value is the amount of time the process has been running in kernel mode
+	Name      string
+	State     string
+	StartTime uint64
+	UTime     uint64 // The UTime value is the time the process has been running in user mode
+	STime     uint64 // The STime value is the amount of time the process has been running in kernel mode
 }
 
 // GetProcStat returns a slice with the parsed details of currently
@@ -96,16 +96,18 @@ func getStatsForPID(PID int) (*ProcessStats, error) {
 	rawStats, fErr := readPIDStatFile(PID)
 	uTime, uErr := strconv.ParseUint(rawStats[procUTimeIdx], 10, 64)
 	sTime, sErr := strconv.ParseUint(rawStats[procSTimeIdx], 10, 64)
+	startTime, stErr := strconv.ParseUint(rawStats[procStartTimeIdx], 10, 64)
 
-	if err := errors.Join(fErr, uErr, sErr); err != nil {
+	if err := errors.Join(fErr, uErr, sErr, stErr); err != nil {
 		return nil, err
 	}
 
 	stats := ProcessStats{
-		Name:  rawStats[procNameIdx],
-		State: rawStats[procStateIdx],
-		UTime: uTime,
-		STime: sTime,
+		Name:      rawStats[procNameIdx],
+		State:     rawStats[procStateIdx],
+		UTime:     uTime,
+		STime:     sTime,
+		StartTime: startTime,
 	}
 
 	return &stats, nil

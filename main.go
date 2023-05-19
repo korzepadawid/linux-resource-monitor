@@ -20,7 +20,7 @@ func main() {
 			}
 
 			for _, stat := range stats {
-				fmt.Printf("{%s %s %d %d}\n", stat.Name, stat.State, stat.UTime, stat.STime)
+				fmt.Printf("{%s %s %d %d %d}\n", stat.Name, stat.State, stat.UTime, stat.STime, stat.StartTime)
 			}
 			fmt.Println()
 		}
