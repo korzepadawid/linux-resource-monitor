@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"resource-monitor/proc"
-	"strconv"
 	"time"
 )
 
@@ -15,29 +13,17 @@ func main() {
 
 	for {
 		select {
-		case <-time.Tick(2 * time.Second):
-			PIDs, err := proc.ReadPIDs()
+		case <-time.Tick(time.Second):
+			stats, err := proc.GetProcStat()
 			if err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 
-			for _, PID := range PIDs {
-				fmt.Println(PID)
-				numPID, err := strconv.Atoi(PID)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				stats, err := proc.GetStatsForPID(numPID)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				fmt.Println(stats)
-				fmt.Printf("%s %s")
-				fmt.Println()
+			for _, stat := range stats {
+				fmt.Printf("{%s %s %d %d}\n", stat.Name, stat.State, stat.UTime, stat.STime)
 			}
-
+			fmt.Println()
 		}
+
 	}
 }
