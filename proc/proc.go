@@ -2,46 +2,54 @@ package proc
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 )
 
 const (
-	// https://man7.org/linux/man-pages/man5/proc.5.html
-	procDir          = "/proc"
-	procPIDStatFmt   = "/proc/%d/stat"
-	statFileSep      = " "
-	procNameIdx      = 1
-	procStateIdx     = 2
-	procUTimeIdx     = 13
-	procSTimeIdx     = 14
-	procStartTimeIdx = 21
+	procDir           = "/proc"
+	procUpTimeFile    = "/proc/uptime"
+	procUpTimeFileSep = " "
 )
 
-// ProcessStats represents the statistics of the given
-// process in the /proc/{proc_pid}/stat file
-type ProcessStats struct {
-	Name      string
-	State     string
-	StartTime uint64
-	UTime     uint64 // The UTime value is the time the process has been running in user mode
-	STime     uint64 // The STime value is the amount of time the process has been running in kernel mode
+type Info struct {
+	ProcStats []*Stats
+	UpTime    float64
 }
 
-// GetProcStat returns a slice with the parsed details of currently
-// running processes
-func GetProcStat() ([]*ProcessStats, error) {
-	PIDs, err := readPIDs()
+// getProcUpTime returns the system's uptime in seconds
+// (uses /proc/uptime)
+func getProcUpTime() (float64, error) {
+	bytes, err := os.ReadFile(procUpTimeFile)
 	if err != nil {
+		return 0, err
+	}
+
+	rawUpTimeFileContent := string(bytes)
+	rawUpTime := strings.Split(rawUpTimeFileContent, procUpTimeFileSep)[0]
+
+	upTimeNum, err := strconv.ParseFloat(rawUpTime, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return upTimeNum, nil
+}
+
+// ReadStat returns a slice with the parsed details of currently
+// running processes
+func ReadStat() (*Info, error) {
+	PIDs, pidErr := readPIDs()
+	upTime, upTimeErr := getProcUpTime()
+
+	if err := errors.Join(pidErr, upTimeErr); err != nil {
 		return nil, err
 	}
 
-	res := make([]*ProcessStats, 0)
+	procStats := make([]*Stats, 0)
 	lock := &sync.Mutex{}
 	wg := &sync.WaitGroup{}
 
@@ -60,7 +68,7 @@ func GetProcStat() ([]*ProcessStats, error) {
 			}
 
 			lock.Lock()
-			res = append(res, stats)
+			procStats = append(procStats, stats)
 			lock.Unlock()
 
 			wg.Done()
@@ -69,58 +77,10 @@ func GetProcStat() ([]*ProcessStats, error) {
 
 	wg.Wait()
 
-	return res, nil
-}
-
-// readPIDs reads PIDs of currently running processes.
-// (the function uses the /proc/ directory)
-func readPIDs() ([]string, error) {
-	regexPID := regexp.MustCompile("^[0-9]*$")
-	dirEntries, err := os.ReadDir(procDir)
-	if err != nil {
-		return nil, err
+	info := &Info{
+		ProcStats: procStats,
+		UpTime:    upTime,
 	}
 
-	dirNamesPID := make([]string, 0)
-	for _, entry := range dirEntries {
-		if entry.IsDir() && regexPID.MatchString(entry.Name()) {
-			dirNamesPID = append(dirNamesPID, entry.Name())
-		}
-	}
-
-	return dirNamesPID, nil
-}
-
-// getStatsForPID reads stats from the /proc/{proc_pid}/stat file.
-func getStatsForPID(PID int) (*ProcessStats, error) {
-	rawStats, fErr := readPIDStatFile(PID)
-	uTime, uErr := strconv.ParseUint(rawStats[procUTimeIdx], 10, 64)
-	sTime, sErr := strconv.ParseUint(rawStats[procSTimeIdx], 10, 64)
-	startTime, stErr := strconv.ParseUint(rawStats[procStartTimeIdx], 10, 64)
-
-	if err := errors.Join(fErr, uErr, sErr, stErr); err != nil {
-		return nil, err
-	}
-
-	stats := ProcessStats{
-		Name:      rawStats[procNameIdx],
-		State:     rawStats[procStateIdx],
-		UTime:     uTime,
-		STime:     sTime,
-		StartTime: startTime,
-	}
-
-	return &stats, nil
-}
-
-func readPIDStatFile(PID int) ([]string, error) {
-	procPIDStatFilePath := fmt.Sprintf(procPIDStatFmt, PID)
-	fileBytes, err := os.ReadFile(procPIDStatFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	line := string(fileBytes)
-	rawStats := strings.Split(line, statFileSep)
-	return rawStats, nil
+	return info, nil
 }

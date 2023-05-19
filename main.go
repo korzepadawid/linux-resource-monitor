@@ -14,12 +14,14 @@ func main() {
 	for {
 		select {
 		case <-time.Tick(time.Second):
-			stats, err := proc.GetProcStat()
+			stats, err := proc.ReadStat()
 			if err != nil {
 				panic(err)
 			}
 
-			for _, stat := range stats {
+			fmt.Println(stats.UpTime)
+
+			for _, stat := range stats.ProcStats {
 				fmt.Printf("{%s %s %d %d %d}\n", stat.Name, stat.State, stat.UTime, stat.STime, stat.StartTime)
 			}
 			fmt.Println()
