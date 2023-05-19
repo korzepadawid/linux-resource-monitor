@@ -19,10 +19,8 @@ func main() {
 				panic(err)
 			}
 
-			fmt.Println(stats.UpTime)
-
-			for _, stat := range stats.ProcStats {
-				fmt.Printf("{%s %s %d %d %d}\n", stat.Name, stat.State, stat.UTime, stat.STime, stat.StartTime)
+			for _, s := range stats {
+				fmt.Printf("{%s, CPU=%f}\n", s.Name, s.CPUUsage())
 			}
 			fmt.Println()
 		}

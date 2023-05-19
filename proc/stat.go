@@ -22,11 +22,24 @@ const (
 // Stats represents the statistics of the given
 // process in the /proc/{proc_pid}/stat file
 type Stats struct {
-	Name      string
-	State     string
-	StartTime uint64 // The StartTime value is the process’s start time
-	UTime     uint64 // The UTime value is the time the process has been running in user mode
-	STime     uint64 // The STime value is the amount of time the process has been running in kernel mode
+	Name      string  // The Name value is the name of the process
+	State     string  // The State value is the state of the process
+	StartTime uint64  // The StartTime value is the process’s start time
+	UTime     uint64  // The UTime value is the time the process has been running in user mode
+	STime     uint64  // The STime value is the amount of time the process has been running in kernel mode
+	UpTime    float64 // The UpTime value is the system’s uptime
+	ClkTck    float64 // The ClkTck value is the number of clock ticks in a second
+}
+
+// CPUUsage returns the CPU usage of the given process in %
+func (s Stats) CPUUsage() float64 {
+	uTimeInSec := float64(s.UTime) / s.ClkTck
+	sTimeInSec := float64(s.STime) / s.ClkTck
+	startTimeInSec := float64(s.StartTime) / s.ClkTck
+
+	elapsedInSec := s.UpTime - startTimeInSec
+	usageInSec := sTimeInSec + uTimeInSec
+	return usageInSec * 100 / elapsedInSec
 }
 
 // readPIDs reads PIDs of currently running processes.
@@ -49,22 +62,29 @@ func readPIDs() ([]string, error) {
 }
 
 // getStatsForPID reads stats from the /proc/{proc_pid}/stat file.
-func getStatsForPID(PID int) (*Stats, error) {
-	rawStats, fErr := readPIDStatFile(PID)
-	uTime, uErr := strconv.ParseUint(rawStats[procUTimeIdx], 10, 64)
-	sTime, sErr := strconv.ParseUint(rawStats[procSTimeIdx], 10, 64)
-	startTime, stErr := strconv.ParseUint(rawStats[procStartTimeIdx], 10, 64)
+func getStatsForPID(PID int, upTime float64, clkTck float64) (*Stats, error) {
+	rawStats, fileErr := readPIDStatFile(PID)
+	uTime, uTimeErr := strconv.ParseUint(rawStats[procUTimeIdx], 10, 64)
+	sTime, sTimeErr := strconv.ParseUint(rawStats[procSTimeIdx], 10, 64)
+	startTime, startTimeErr := strconv.ParseUint(rawStats[procStartTimeIdx], 10, 64)
 
-	if err := errors.Join(fErr, uErr, sErr, stErr); err != nil {
+	if err := errors.Join(
+		fileErr,
+		uTimeErr,
+		sTimeErr,
+		startTimeErr,
+	); err != nil {
 		return nil, err
 	}
 
 	stats := Stats{
-		Name:      rawStats[procNameIdx],
+		Name:      rawStats[procNameIdx][1 : len(rawStats[procNameIdx])-1],
 		State:     rawStats[procStateIdx],
+		StartTime: startTime,
 		UTime:     uTime,
 		STime:     sTime,
-		StartTime: startTime,
+		UpTime:    upTime,
+		ClkTck:    clkTck,
 	}
 
 	return &stats, nil

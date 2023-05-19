@@ -15,11 +15,6 @@ const (
 	procUpTimeFileSep = " "
 )
 
-type Info struct {
-	ProcStats []*Stats
-	UpTime    float64
-}
-
 // getProcUpTime returns the system's uptime in seconds
 // (uses /proc/uptime)
 func getProcUpTime() (float64, error) {
@@ -41,11 +36,15 @@ func getProcUpTime() (float64, error) {
 
 // ReadStat returns a slice with the parsed details of currently
 // running processes
-func ReadStat() (*Info, error) {
+func ReadStat() ([]*Stats, error) {
 	PIDs, pidErr := readPIDs()
 	upTime, upTimeErr := getProcUpTime()
+	clkTck := getClkTck()
 
-	if err := errors.Join(pidErr, upTimeErr); err != nil {
+	if err := errors.Join(
+		pidErr,
+		upTimeErr,
+	); err != nil {
 		return nil, err
 	}
 
@@ -62,7 +61,7 @@ func ReadStat() (*Info, error) {
 				log.Fatal(err)
 			}
 
-			stats, err := getStatsForPID(numPID)
+			stats, err := getStatsForPID(numPID, upTime, clkTck)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -77,10 +76,5 @@ func ReadStat() (*Info, error) {
 
 	wg.Wait()
 
-	info := &Info{
-		ProcStats: procStats,
-		UpTime:    upTime,
-	}
-
-	return info, nil
+	return procStats, nil
 }
